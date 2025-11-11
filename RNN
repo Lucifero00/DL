@@ -1,0 +1,104 @@
+import numpy as np
+
+text = "I Love AI"
+chars = sorted(list(set(text)))
+vocab_size = len(chars)
+
+char_to_idx = {ch: i for i, ch in enumerate(chars)}
+idx_to_char = {i: ch for ch, i in char_to_idx.items()}
+
+data = [char_to_idx[ch] for ch in text]
+
+print("Characters:", chars)
+print("Character-to-Index Mapping:", char_to_idx)
+
+np.random.seed(42)
+
+input_size = vocab_size
+hidden_size = 16
+output_size = vocab_size
+lr = 0.1
+epochs = 5000
+clip_value = 5.0
+
+Wxh = np.random.randn(hidden_size, input_size) * 0.01
+Whh = np.random.randn(hidden_size, hidden_size) * 0.01
+Why = np.random.randn(output_size, hidden_size) * 0.01
+
+bh = np.zeros((hidden_size, 1))
+by = np.zeros((output_size, 1))
+
+def softmax(x):
+    e = np.exp(x - np.max(x, axis=0, keepdims=True))
+    return e / np.sum(e, axis=0, keepdims=True)
+
+def one_hot(idx, size=vocab_size):
+    vec = np.zeros((size, 1))
+    vec[idx] = 1
+    return vec
+
+for epoch in range(1, epochs + 1):
+    h_prev = np.zeros((hidden_size, 1))
+    total_loss = 0.0
+
+    for t in range(len(data) - 1):
+        x = one_hot(data[t])
+        target = data[t + 1]
+
+        h = np.tanh(Wxh @ x + Whh @ h_prev + bh)
+        y = Why @ h + by
+        p = softmax(y)
+
+        loss = -np.log(p[target, 0] + 1e-9)
+        total_loss += loss
+
+        dy = p.copy()
+        dy[target, 0] -= 1
+
+        dWhy = dy @ h.T
+        dby = dy
+        dh = Why.T @ dy
+        dh_raw = (1 - h ** 2) * dh
+        dWxh = dh_raw @ x.T
+        dWhh = dh_raw @ h_prev.T
+        dbh = dh_raw
+
+        for grad in (dWxh, dWhh, dWhy, dbh, dby):
+            np.clip(grad, -clip_value, clip_value, out=grad)
+
+        Wxh -= lr * dWxh
+        Whh -= lr * dWhh
+        Why -= lr * dWhy
+        bh  -= lr * dbh
+        by  -= lr * dby
+
+        h_prev = h
+
+    if epoch % 1000 == 0 or epoch == 1 or epoch == epochs:
+        print(f"Epoch {epoch:5d} | Loss: {total_loss:.4f}")
+
+print("\n Training complete!")
+
+def predict_text(seed_char, length=20):
+    h_prev = np.zeros((hidden_size, 1))
+    if seed_char not in char_to_idx:
+        raise ValueError("Seed character not in vocabulary!")
+
+    idx = char_to_idx[seed_char]
+    generated = seed_char
+
+    for _ in range(length):
+        x = one_hot(idx)
+        h_prev = np.tanh(Wxh @ x + Whh @ h_prev + bh)
+        y = Why @ h_prev + by
+        p = softmax(y).ravel()
+        idx = np.random.choice(range(vocab_size), p=p)
+        generated += idx_to_char[idx]
+
+    return generated
+
+print("\n Generated text (seed='I'):")
+print(predict_text("I", 30))
+
+print("\n Generated text (seed=' '):")
+print(predict_text(" ", 30))
