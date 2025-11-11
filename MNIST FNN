@@ -1,0 +1,89 @@
+import zipfile
+
+zip_path = "/content/MNIST-20221031T095906Z-001.zip"
+with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+    zip_ref.extractall("/content/MNIST")
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Flatten
+from tensorflow.keras.utils import to_categorical
+
+from sklearn.model_selection import train_test_split
+
+data = pd.read_csv("/content/MNIST/MNIST/mnist_784_csv.csv")
+data.head()
+
+X = data.drop(columns=['class']).values
+Y = data['class'].values
+
+print("X shape:", X.shape)
+print("Y shape:", Y.shape)
+
+Y = to_categorical(Y, num_classes=10)
+
+x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+
+print(x_train.shape)
+print(y_train.shape)
+print(x_test.shape)
+print(y_test.shape)
+
+sample_image = x_train[5].reshape(28, 28)
+digit_label = np.argmax(y_train[5])
+
+plt.matshow(sample_image, cmap='gray')
+plt.title(f"Label: {digit_label}")
+plt.axis('off')
+plt.show()
+
+plt.figure(figsize=(15, 2))
+for i in range(10):
+    sample_image = x_train[i].reshape(28, 28)
+    digit_label = np.argmax(y_train[i])
+    plt.subplot(1, 10, i + 1)
+    plt.imshow(sample_image, cmap='gray', vmin=0, vmax=255)
+    plt.title(f"{digit_label}")
+    plt.axis('off')
+plt.show()
+
+model = Sequential([
+    Flatten(input_shape=(784,)),
+    Dense(128, activation='relu'),
+    Dense(64, activation='relu'),
+    Dense(10, activation='softmax')
+])
+
+model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+history = model.fit(x_train, y_train,
+                    epochs=5,
+                    batch_size=32,
+                    validation_split=0.2,
+                    verbose=1)
+
+test_loss, test_acc = model.evaluate(x_test, y_test, verbose=1)
+print("Test loss:", test_loss)
+print("Test accuracy:", test_acc)
+
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.show()
+
+plt.figure(figsize=(15, 2))
+for i in range(10):
+    plt.subplot(1, 10, i + 1)
+    sample_image = x_train[i].reshape(28, 28)
+    digit_label = np.argmax(y_train[i])
+    plt.imshow(sample_image, cmap='gray', vmin=0, vmax=255)
+    plt.title(digit_label)
+    plt.axis('off')
+plt.show()
