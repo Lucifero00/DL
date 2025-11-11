@@ -1,0 +1,98 @@
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from tensorflow import keras
+import matplotlib.pyplot as plt
+from sklearn.metrics import (
+    confusion_matrix, classification_report,
+    accuracy_score, precision_score, recall_score
+)
+from sklearn.model_selection import train_test_split
+from tensorflow.keras import layers, models
+from sklearn.preprocessing import StandardScaler
+import seaborn as sns
+
+dataset = pd.read_csv('creditcard.csv')
+
+X = dataset.drop('Class', axis=1)
+y = dataset['Class']
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.2, random_state=42, stratify=y
+)
+
+X_train_normal = X_train[y_train == 0]
+X_test_normal = X_test[y_test == 0]
+X_test_anomalies = X_test[y_test == 1]
+y_test_np = np.array(y_test)
+
+input_dim = X_train_normal.shape[1]
+
+encoder = models.Sequential([
+    layers.Input(shape=(input_dim,)),
+    layers.Dense(32, activation="relu"),
+    layers.Dense(16, activation="relu"),
+    layers.Dense(8, activation="relu")
+], name="encoder")
+
+decoder = models.Sequential([
+    layers.Input(shape=(8,)),
+    layers.Dense(16, activation="relu"),
+    layers.Dense(32, activation="relu"),
+    layers.Dense(input_dim, activation="linear")
+], name="decoder")
+
+autoencoder = models.Sequential([encoder, decoder], name="autoencoder")
+autoencoder.compile(loss="mean_squared_error", optimizer="adam")
+autoencoder.summary()
+
+history = autoencoder.fit(
+    X_train_normal, X_train_normal,
+    epochs=10,
+    shuffle=True,
+    batch_size=64,
+    validation_data=(X_test_normal, X_test_normal)
+)
+
+X_test_reconstructed = autoencoder.predict(X_test)
+mse = np.mean(np.power(X_test - X_test_reconstructed, 2), axis=1)
+
+threshold = np.percentile(mse[y_test_np == 0], 95)
+print("Reconstruction error threshold (95th percentile of normal test MSE):", threshold)
+
+anomalies = mse > threshold
+total_anomalies = np.sum(anomalies)
+print("Total No. of Anomalies Detected:", total_anomalies)
+
+plt.figure(figsize=(12, 6))
+plt.plot(mse, label="MSE (reconstruction error)", marker='o', linestyle='', markersize=3)
+plt.axhline(threshold, label=f"Threshold = {threshold:.4f}", color="red")
+plt.xlabel("Test sample index")
+plt.ylabel("MSE")
+plt.title("Reconstruction Error (MSE) for Test Samples")
+plt.legend()
+plt.show()
+
+conf_matrix = confusion_matrix(y_test_np, anomalies)
+print("Confusion Matrix:\n", conf_matrix)
+
+print("\nClassification Report:")
+print(classification_report(y_test_np, anomalies, digits=4))
+
+plt.figure(figsize=(6, 4))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', cbar=False, annot_kws={"size": 14})
+plt.xlabel("Predicted label (0=normal, 1=anomaly)")
+plt.ylabel("True label (0=normal, 1=fraud)")
+plt.title("Confusion Matrix")
+plt.show()
+
+accuracy = accuracy_score(y_test_np, anomalies)
+precision = precision_score(y_test_np, anomalies, zero_division=0)
+recall = recall_score(y_test_np, anomalies, zero_division=0)
+
+print(f"Accuracy:  {accuracy:.4f}")
+print(f"Precision: {precision:.4f}")
+print(f"Recall:    {recall:.4f}")
