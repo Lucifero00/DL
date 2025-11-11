@@ -1,0 +1,43 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras.datasets import cifar10
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Flatten, Dense
+from tensorflow.keras.utils import to_categorical
+import random
+
+(x_train, y_train), (x_test, y_test) = cifar10.load_data()
+
+x_train = x_train.astype('float32') / 255.0
+x_test = x_test.astype('float32') / 255.0
+
+y_train = to_categorical(y_train, 10)
+y_test = to_categorical(y_test, 10)
+
+model = Sequential([
+    Flatten(input_shape=(32, 32, 3)),
+    Dense(512, activation='relu'),
+    Dense(256, activation='relu'),
+    Dense(10, activation='softmax')
+])
+
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+model.summary()
+
+history = model.fit(x_train, y_train, epochs=10, batch_size=128, validation_split=0.1, verbose=1)
+
+loss, acc = model.evaluate(x_test, y_test, verbose=0)
+print(f"Test accuracy: {acc*100:.2f}%" )
+
+classes = ['Airplane','Automobile','Bird','Cat','Deer','Dog','Frog','Horse','Ship','Truck']
+idxs = random.sample(range(len(x_test)), 10)
+preds = model.predict(x_test[idxs])
+
+plt.figure(figsize=(10,4))
+for i, idx in enumerate(idxs):
+    plt.subplot(2,5,i+1)
+    plt.imshow(x_test[idx])
+    plt.axis('off')
+    plt.title(classes[np.argmax(preds[i])])
+plt.tight_layout()
+plt.show()
