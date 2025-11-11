@@ -1,0 +1,80 @@
+import zipfile
+import os
+import random
+import numpy as np
+import matplotlib.pyplot as plt
+
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator, image
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+
+zip_path = "/content/Fashion MNIST-20221031T093245Z-001.zip"
+
+with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+    zip_ref.extractall("/content/FashionMNIST")
+
+train_dir = r"C:\Users\sapar\Downloads\brain tumour\Training"
+test_dir = r"C:\Users\sapar\Downloads\brain tumour\Testing"
+
+train_datagen = ImageDataGenerator(rescale=1./255)
+test_datagen = ImageDataGenerator(rescale=1./255)
+
+train_gen = train_datagen.flow_from_directory(
+    train_dir,
+    target_size=(150, 150),
+    batch_size=128,
+    class_mode='categorical'
+)
+
+test_gen = test_datagen.flow_from_directory(
+    test_dir,
+    target_size=(150, 150),
+    batch_size=128,
+    class_mode='categorical'
+)
+
+model = Sequential([
+    Conv2D(32, (3, 3), activation='relu', input_shape=(150, 150, 3)),
+    MaxPooling2D(2, 2),
+    Conv2D(64, (3, 3), activation='relu'),
+    MaxPooling2D(2, 2),
+    Conv2D(128, (3, 3), activation='relu'),
+    MaxPooling2D(2, 2),
+    Flatten(),
+    Dense(256, activation='relu'),
+    Dropout(0.5),
+    Dense(4, activation='softmax')
+])
+
+model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+history = model.fit(train_gen, epochs=10, validation_data=test_gen)
+
+test_loss, test_acc = model.evaluate(test_gen)
+print("test_acc", test_acc * 100)
+
+plt.plot(history.history['loss'], label='Training Loss')
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.title("Training Performance")
+plt.xlabel("Epochs")
+plt.ylabel("Value")
+plt.legend()
+plt.show()
+
+class_labels = list(train_gen.class_indices.keys())
+
+cls = random.choice(os.listdir(test_dir))
+img_name = random.choice(os.listdir(os.path.join(test_dir, cls)))
+img_path = os.path.join(test_dir, cls, img_name)
+
+img = tf.keras.utils.load_img(img_path, target_size=(150, 150))
+plt.imshow(img)
+plt.axis('off')
+
+x = np.expand_dims(tf.keras.utils.img_to_array(img) / 255.0, axis=0)
+pred = model.predict(x)
+plt.title(f"Actual: {cls} | Predicted: {class_labels[np.argmax(pred)]}")
+plt.show()
