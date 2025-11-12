@@ -1,9 +1,4 @@
 import zipfile
-
-zip_path = "/content/MNIST-20221031T095906Z-001.zip"
-with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-    zip_ref.extractall("/content/MNIST")
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,23 +9,18 @@ from tensorflow.keras.utils import to_categorical
 
 from sklearn.model_selection import train_test_split
 
+zip_path = "/content/MNIST-20221031T095906Z-001.zip"
+with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+    zip_ref.extractall("/content/MNIST")
+
 data = pd.read_csv("/content/MNIST/MNIST/mnist_784_csv.csv")
-data.head()
 
 X = data.drop(columns=['class']).values
 Y = data['class'].values
 
-print("X shape:", X.shape)
-print("Y shape:", Y.shape)
-
 Y = to_categorical(Y, num_classes=10)
 
 x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
-
-print(x_train.shape)
-print(y_train.shape)
-print(x_test.shape)
-print(y_test.shape)
 
 sample_image = x_train[5].reshape(28, 28)
 digit_label = np.argmax(y_train[5])
@@ -78,12 +68,30 @@ plt.ylabel('Accuracy')
 plt.legend()
 plt.show()
 
-plt.figure(figsize=(15, 2))
-for i in range(10):
-    plt.subplot(1, 10, i + 1)
-    sample_image = x_train[i].reshape(28, 28)
-    digit_label = np.argmax(y_train[i])
+predictions = model.predict(x_test)
+predicted_labels = np.argmax(predictions, axis=1)
+true_labels = np.argmax(y_test, axis=1)
+
+print("Sample Predictions (first 10):", predicted_labels[:10])
+print("Sample True Labels (first 10):", true_labels[:10])
+
+plt.figure(figsize=(15, 4))
+plt.suptitle("Model Predictions vs. True Labels", fontsize=16)
+
+for i in range(15):
+    plt.subplot(3, 5, i + 1)
+    
+    sample_image = x_test[i].reshape(28, 28)
+    
+    pred_label = predicted_labels[i]
+    true_label = true_labels[i]
+    
+    color = 'green' if pred_label == true_label else 'red'
+    
     plt.imshow(sample_image, cmap='gray', vmin=0, vmax=255)
-    plt.title(digit_label)
+    
+    plt.title(f"Pred: {pred_label}\nTrue: {true_label}", color=color)
     plt.axis('off')
+
+plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 plt.show()
